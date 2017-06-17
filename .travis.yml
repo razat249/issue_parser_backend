@@ -1,0 +1,29 @@
+language: python
+
+python:
+  - "2.7"
+
+services: mysql
+
+env:
+  - DJANGO=1.11.1
+
+before_install:
+  - export DJANGO_SETTINGS_MODULE=issue_parser.settings
+  - export PYTHONPATH=$HOME/builds/razat249/issue_parser_backend
+  - export PIP_USE_MIRRORS=true
+
+install:
+  - pip install -q Django==$DJANGO --use-mirrors
+  - pip install pep8 --use-mirrors
+  - pip install mysql-python --use-mirrors
+  # - pip install https://github.com/dcramer/pyflakes/tarball/master
+  # - pip install -q -e . --use-mirrors
+
+before_script:
+#   - "pep8 --exclude=migrations --ignore=E501,E225 src"
+#   - pyflakes -x W src
+  - mysql -e 'create database test_db;'
+
+script:
+  - python manage.py test

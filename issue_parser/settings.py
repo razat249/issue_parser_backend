@@ -86,6 +86,18 @@ WSGI_APPLICATION = 'issue_parser.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
 
+if 'TRAVIS' in os.environ:
+    DATABASES = {
+        'default': {
+            'ENGINE':   'django.db.backends.mysql',
+            'NAME':     'travisci',
+            'USER':     'root',
+            'PASSWORD': '',
+            'HOST':     'localhost',
+            'PORT':     '',
+        }
+    }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
