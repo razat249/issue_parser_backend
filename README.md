@@ -1,4 +1,6 @@
 # issue_parser_backend
+[![Build Status](https://travis-ci.org/razat249/issue_parser_backend.svg?branch=master)](https://travis-ci.org/razat249/issue_parser_backend)
+
 Backend api for issue parser app.
 ## Contributing
 Follow below steps for building the project.
