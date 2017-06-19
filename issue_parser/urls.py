@@ -14,8 +14,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf.urls import url
+from rest_framework.urlpatterns import format_suffix_patterns
+from core import views
 from django.contrib import admin
 
 urlpatterns = [
+    url(r'^userrepos/$', views.UserRepoList.as_view()),
+    url(r'^issues/$', views.IssueList.as_view()),
+    url(r'^metadata/$', views.MetaData.as_view()),
     url(r'^admin/', admin.site.urls),
 ]
+
+urlpatterns = format_suffix_patterns(urlpatterns)
