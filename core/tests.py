@@ -8,12 +8,14 @@ import json
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
+from requests.exceptions import ConnectionError
 
-from .models import UserRepo, parse_issue, validate_and_store_issue, Issue, delete_closed_issues
+from .models import (UserRepo, parse_issue, validate_and_store_issue, Issue, delete_closed_issues, 
+                     is_issue_valid, is_issue_state_open, periodic_issues_updater)
 from .utils.mock_api import api_response_issues
 from .utils.services import request_github_issues
 
-SAMPLE_ISSUE = {
+SAMPLE_VALID_ISSUE = {
     "html_url": "https://github.com/mozillacampusclubs/issue_parser_backend/issues/7",
     "id": 233564738,
     "number": 7,
@@ -72,40 +74,61 @@ class IssueModelAndFetcherTestCase(TestCase):
     def test_api_can_request_issues(self):
         """Test the request function"""
         payload = request_github_issues('razat249', 'github-view')
-        self.assertEqual(payload['error'], False)
-        self.assertLess(payload['status_code'], 400)
+        if payload['error_type'] == ConnectionError:
+            pass
+        else:
+            self.assertEqual(payload['error'], False)
+            self.assertLess(payload['status_code'], 400)
 
     def test_api_request_can_handle_errors(self):
         """Test the request function can handle errors"""
         # wrong repo name to test error handling.
         payload = request_github_issues('razat249', 'wrong_repo')
-        self.assertEqual(payload['error'], True)
-        self.assertGreaterEqual(payload['status_code'], 400)
+        if payload['error_type'] == ConnectionError:
+            pass
+        else:
+            self.assertEqual(payload['error'], True)
+            self.assertGreaterEqual(payload['status_code'], 400)
 
     def test_correct_issue_parsing(self):
         """Test for correct parsing of issues"""
-        issue = SAMPLE_ISSUE.copy()
+        issue = SAMPLE_VALID_ISSUE.copy()
         parsed = parse_issue(issue['body'])
         for item in parsed:
             self.assertTrue(item)
 
+    def test_issue_valid_and_not_valid_cases(self):
+        """Test for checking if issue is valid or not"""
+        valid_issue = SAMPLE_VALID_ISSUE.copy()
+        invalid_issue = valid_issue.copy()
+        invalid_issue['body'] = ''
+        self.assertTrue(is_issue_valid(valid_issue))
+        self.assertFalse(is_issue_valid(invalid_issue))
+
+    def test_issue_state_open_or_not(self):
+        """Test for checking issue state"""
+        open_issue = SAMPLE_VALID_ISSUE.copy()
+        closed_issue = SAMPLE_VALID_ISSUE.copy()
+        closed_issue['state'] = 'closed'
+        self.assertTrue(is_issue_state_open(open_issue))
+        self.assertFalse(is_issue_state_open(closed_issue))
+
     def test_validate_and_store_issue(self):
         """Test for validating and storing issues."""
         old_count = Issue.objects.count()
-        validate_and_store_issue(SAMPLE_ISSUE)
+        validate_and_store_issue(SAMPLE_VALID_ISSUE)
         new_count = Issue.objects.count()
-        self.assertNotEqual(old_count, new_count)
+        self.assertLess(old_count, new_count)
 
     def test_api_can_delete_closed_issues_in_db(self):
         """Test for checking if issues are deleted when closed online but present in db"""
-        issue = SAMPLE_ISSUE.copy()
+        issue = SAMPLE_VALID_ISSUE.copy()
         validate_and_store_issue(issue)
         issue['state'] = 'closed'
         old_count = Issue.objects.count()
         delete_closed_issues(issue)
         new_count = Issue.objects.count()
         self.assertLess(new_count, old_count)
-
 
 class ViewTestCase(TestCase):
     """This class defines the test suite for the api views."""
