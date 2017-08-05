@@ -95,6 +95,44 @@ class Issue(models.Model):
         ordering = ('updated_at',) # Ascending order according to updated_at.
 
 
+class LanguageKnowledgeBase(models.Model):
+    """
+    IssueKnowledgeBase model is used as a knowledge base for `languages`.
+    """
+    language = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return '%s' % (self.language)
+
+
+class TechStackKnowledgeBase(models.Model):
+    """
+    TechStackKnowledgeBase model is used as a knowledge base for `tech_stack`.
+    """
+    tech_stack = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return '%s' % (self.tech_stack)
+
+
+class ExperienceNeededKnowledgeBase(models.Model):
+    """
+    ExperienceNeededKnowledgeBase model is used as a knowledge base for `experience_needed`.
+    """
+    experience_needed = models.CharField(max_length=100, unique=True)
+    correct_experience_needed_value = models.CharField(max_length=100)
+
+    def __str__(self):
+        return '%s - %s' % (self.experience_needed, self.correct_experience_needed_value)
+
+
+# class ExpectedTimeKnowledgeBase(models.Model):
+#     """
+#     ExpectedTimeKnowledgeBase model is used as a knowledge base for `expected_time`.
+#     """
+#     expected_time = models.CharField(max_length=100)
+
+
 @periodic_task(run_every=timedelta(minutes=ISSUE_UPDATE_PERIOD), name="periodic_issues_updater")
 def periodic_issues_updater():
     """
@@ -141,23 +179,19 @@ def is_issue_valid(issue):
     Checks if issue is valid for system or not.
     Return True if valid else return false.
     """
-    parsed = parse_issue(issue['body'])
-    for item in parsed:
-        if not item:
-            return False # issue is not valid
-    print 'Issue with id ' + str(issue['id']) + ' is not valid for our system.'
-    return True # issue is valid
+    parsed = parse_issue_by_label(issue['labels'])
+    if len(parsed) == 4:
+        return True # issue is valid
+    else:
+        print 'Issue with id ' + str(issue['id']) + ' is not valid for our system.'
+        return False # issue is not valid
 
 def store_issue_in_db(issue, region_queryset):
     """Stores issue in db"""
-    experience_needed, language, expected_time, technology_stack = parse_issue(issue['body'])
-    experience_needed = experience_needed.strip().lower()
-    language = language.strip().lower()
-    expected_time = expected_time.strip().lower()
-    technology_stack = technology_stack.strip().lower()
+    parsed_labels = parse_issue_by_label(issue['labels'])
     issue_instance = Issue(issue_id=issue['id'], title=issue['title'],
-                           experience_needed=experience_needed, expected_time=expected_time,
-                           language=language, tech_stack=technology_stack,
+                           experience_needed=parsed_labels['experience_needed'], expected_time=parsed_labels['expected_time'],
+                           language=parsed_labels['language'], tech_stack=parsed_labels['tech_stack'],
                            created_at=issue['created_at'], updated_at=issue['updated_at'],
                            issue_number=issue['number'], issue_url=issue['html_url'],
                            issue_body=issue['body'])
@@ -177,17 +211,43 @@ def delete_closed_issues(issue):
     except Exception:
         print 'Closed issue with id ' + str(issue['id']) + ' is not present is database.'
 
-def parse_issue(issue_body):
+def parse_issue_by_label(labels_list):
     """
-    Parse the issue body and return `experience_needed`, `language`,
+    Parse issue labels and return `experience_needed`, `language`,
     `expected_time` and `technology_stack`.
     """
-    issue_body = issue_body.lower()
-    experience_needed = find_between(issue_body, 'experience', '\r\n')
-    language = find_between(issue_body, 'language', '\r\n')
-    expected_time = find_between(issue_body, 'expected-time', '\r\n')
-    technology_stack = find_between(issue_body, 'technology-stack', '\r\n')
-    return experience_needed, language, expected_time, technology_stack
+    parsed_data = {'expected_time': '20 days'}
+    for label in labels_list:
+        label_name = label['name'].strip().lower()
+        knowledgeClass = classify_label(label_name)
+        if knowledgeClass:
+            parsed_data[knowledgeClass] = label_name
+
+    return parsed_data
+
+def classify_label(label):
+    """Classify a label to a particular knowledge class."""
+    experience_needed = 'experience_needed'
+    language = 'language'
+    tech_stack = 'tech_stack'
+    correct_experience_needed_value = 'correct_experience_needed_value'
+
+    experience_knowledge = ExperienceNeededKnowledgeBase.objects.values(experience_needed, correct_experience_needed_value)
+    language_knowledge = LanguageKnowledgeBase.objects.values(language)
+    tech_stack_knowledge = TechStackKnowledgeBase.objects.values(tech_stack)
+
+    experience_knowledge_list = [i[experience_needed] for i in experience_knowledge]
+    language_knowledge_list = [i[language] for i in language_knowledge]
+    tech_stack_knowledge_list = [i[tech_stack] for i in tech_stack_knowledge]
+
+    if label in experience_knowledge_list:
+        return experience_needed
+    elif label in language_knowledge_list:
+        return language
+    elif label in tech_stack_knowledge_list:
+        return tech_stack
+    else:
+        return False
 
 def find_between(string, first, last):
     """

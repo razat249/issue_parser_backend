@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from core.models import UserRepo, Issue, IssueLabel, Region, RegionAdmin
+from core.models import UserRepo, Issue, IssueLabel, Region, RegionAdmin, LanguageKnowledgeBase, ExperienceNeededKnowledgeBase, TechStackKnowledgeBase
 from django.contrib.auth.models import *
 
 
@@ -55,3 +55,6 @@ admin.site.register(RegionAdmin)
 admin.site.register(UserRepo, UserRepoAdmin)
 admin.site.register(Region)
 admin.site.register(Issue)
+admin.site.register(ExperienceNeededKnowledgeBase)
+admin.site.register(TechStackKnowledgeBase)
+admin.site.register(LanguageKnowledgeBase)

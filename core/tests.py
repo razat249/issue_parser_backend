@@ -10,35 +10,14 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from requests.exceptions import ConnectionError
 
-from .models import (UserRepo, parse_issue, validate_and_store_issue, Issue, delete_closed_issues, 
+from .models import (UserRepo, validate_and_store_issue, Issue, delete_closed_issues, 
                      is_issue_valid, is_issue_state_open, periodic_issues_updater, Region, RegionAdmin,
-                     retrive_regions_for_a_user)
+                     retrive_regions_for_a_user, ExperienceNeededKnowledgeBase, LanguageKnowledgeBase, TechStackKnowledgeBase,
+                     classify_label, parse_issue_by_label)
 from .utils.mock_api import api_response_issues
 from .utils.services import request_github_issues
 
-SAMPLE_VALID_ISSUE = {
-    "html_url": "https://github.com/mozillacampusclubs/issue_parser_backend/issues/7",
-    "id": 233564738,
-    "number": 7,
-    "title": "Dockerize Project",
-    "labels": [
-        {
-            "id": 613678729,
-            "url": "https://api.github.com/repos/labels/enhancement",
-            "name": "enhancement",
-            "color": "84b6eb",
-            "default": True
-        }
-    ],
-    "state": "open",
-    "created_at": "2017-06-05T11:47:01Z",
-    "updated_at": "2017-06-06T10:35:57Z",
-    "body": """
-            Experience: Easyfix\r\nExpected-time: 3 hours\r\nLanguage: Python\r\n
-            Technology-stack Django\r\n\r\n## Description\r\n
-            Dockerize this backend project for development and deployment purposes.
-            """
-}
+SAMPLE_VALID_ISSUE = api_response_issues[0]
 
 class UserRepoModelTestCase(TestCase):
     """This class defines the test suite for the `UserRepo` model."""
@@ -108,6 +87,26 @@ class IssueModelAndFetcherTestCase(TestCase):
         self.user_repo.regions.add(self.region)        
         self.region_queryset = Region.objects.filter(userrepo=self.USER_ID)
 
+        instance1 = ExperienceNeededKnowledgeBase(experience_needed='easyfix',
+                                                  correct_experience_needed_value='easy')
+        instance1.save()
+        instance2 = ExperienceNeededKnowledgeBase(experience_needed='moderate',
+                                                  correct_experience_needed_value='moderate')
+        instance2.save()
+        instance3 = ExperienceNeededKnowledgeBase(experience_needed='senior',
+                                                  correct_experience_needed_value='senior')
+        instance3.save()
+
+        instance4 = LanguageKnowledgeBase(language='python')
+        instance4.save()
+        instance5 = LanguageKnowledgeBase(language='javascript')
+        instance5.save()
+
+        instance6 = TechStackKnowledgeBase(tech_stack='django')
+        instance6.save()
+        instance7 = TechStackKnowledgeBase(tech_stack='react.js')
+        instance7.save()
+
     def test_api_can_request_issues(self):
         """Test the request function"""
         payload = request_github_issues('razat249', 'github-view')
@@ -130,15 +129,14 @@ class IssueModelAndFetcherTestCase(TestCase):
     def test_correct_issue_parsing(self):
         """Test for correct parsing of issues"""
         issue = SAMPLE_VALID_ISSUE.copy()
-        parsed = parse_issue(issue['body'])
-        for item in parsed:
-            self.assertTrue(item)
+        parsed = parse_issue_by_label(issue['labels'])
+        self.assertEqual(4, len(parsed))
 
     def test_issue_valid_and_not_valid_cases(self):
         """Test for checking if issue is valid or not"""
         valid_issue = SAMPLE_VALID_ISSUE.copy()
         invalid_issue = valid_issue.copy()
-        invalid_issue['body'] = ''
+        invalid_issue['labels'] = []
         self.assertTrue(is_issue_valid(valid_issue))
         self.assertFalse(is_issue_valid(invalid_issue))
 
@@ -171,6 +169,26 @@ class IssueModelAndFetcherTestCase(TestCase):
         """Test function can retrive regions for a user."""
         regions = retrive_regions_for_a_user(self.USER_REPO_ID)
         self.assertEqual(regions[0], self.region_queryset[0])
+
+    def test_label_can_be_categorized(self):
+        "Test function can classify label to different knowledge classes."
+        received_label1 = 'easyfix'
+        output = 'experience_needed'
+        classified_class = classify_label(received_label1)
+        self.assertEqual(classified_class, output)
+
+    def test_api_can_parse_issue_labels(self):
+        """Test for parsing labels."""
+        labels_list = SAMPLE_VALID_ISSUE['labels']
+
+        expected_output = {
+            'expected_time': '20 days',
+            'experience_needed': 'moderate',
+            'language': 'python',
+            'tech_stack': 'django',
+        }
+        output = parse_issue_by_label(labels_list)
+        self.assertEqual(output, expected_output)
 
 class ViewTestCase(TestCase):
     """This class defines the test suite for the api views."""
@@ -208,7 +226,6 @@ class ViewTestCase(TestCase):
         """Test the api can get given issues list."""
         response = self.client.get('/issues/', format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(api_response_issues), len(json.loads(response.content)))
 
     def test_api_can_get_filtered_issues_list(self):
         """Test api can get filtered issues list."""
