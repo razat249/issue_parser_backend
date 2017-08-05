@@ -172,9 +172,10 @@ class IssueModelAndFetcherTestCase(TestCase):
 
     def test_label_can_be_categorized(self):
         "Test function can classify label to different knowledge classes."
-        received_label1 = 'easyfix'
-        output = 'experience_needed'
-        classified_class = classify_label(received_label1)
+        received_label = 'easyfix'
+        correct_label = 'easy'
+        output = ('experience_needed', correct_label)
+        classified_class = classify_label(received_label)
         self.assertEqual(classified_class, output)
 
     def test_api_can_parse_issue_labels(self):

@@ -218,8 +218,7 @@ def parse_issue_by_label(labels_list):
     """
     parsed_data = {'expected_time': '20 days'}
     for label in labels_list:
-        label_name = label['name'].strip().lower()
-        knowledgeClass = classify_label(label_name)
+        knowledgeClass, label_name = classify_label(label['name'])
         if knowledgeClass:
             parsed_data[knowledgeClass] = label_name
 
@@ -227,6 +226,8 @@ def parse_issue_by_label(labels_list):
 
 def classify_label(label):
     """Classify a label to a particular knowledge class."""
+    label = label.strip().lower()
+
     experience_needed = 'experience_needed'
     language = 'language'
     tech_stack = 'tech_stack'
@@ -236,18 +237,22 @@ def classify_label(label):
     language_knowledge = LanguageKnowledgeBase.objects.values(language)
     tech_stack_knowledge = TechStackKnowledgeBase.objects.values(tech_stack)
 
-    experience_knowledge_list = [i[experience_needed] for i in experience_knowledge]
-    language_knowledge_list = [i[language] for i in language_knowledge]
-    tech_stack_knowledge_list = [i[tech_stack] for i in tech_stack_knowledge]
+    experience_knowledge_list = {}
+    for exp in experience_knowledge:
+        x = exp['experience_needed'].strip().lower()
+        experience_knowledge_list[x] = exp['correct_experience_needed_value']
+
+    language_knowledge_list = [i[language].strip().lower() for i in language_knowledge]
+    tech_stack_knowledge_list = [i[tech_stack].strip().lower() for i in tech_stack_knowledge]
 
     if label in experience_knowledge_list:
-        return experience_needed
+        return experience_needed, experience_knowledge_list[label]
     elif label in language_knowledge_list:
-        return language
+        return language, label
     elif label in tech_stack_knowledge_list:
-        return tech_stack
+        return tech_stack, label
     else:
-        return False
+        return False, label
 
 def find_between(string, first, last):
     """
